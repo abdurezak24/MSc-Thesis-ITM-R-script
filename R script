@@ -1,0 +1,306 @@
+# R codes for onchocerciasis diagnostic study among pregenant women in south sudan.
+# cleaning and merge data frames of photo1 and redcap 
+# cleaning and merge data frames of photo1 and redcap 
+
+# library 
+library(readxl) # open  excel file 
+library(tidyverse) # multiple function  
+library(openxlsx) # open and save excel file 
+
+#load photo data
+setwd("D:/ITM ppt/thesis/draft/anaysis")
+photo1<-read_excel("28052024_Photo_valid_Amber.xlsx")
+# Rename the column and convert its values to lowercase
+photo1 <- photo1 %>% rename(patient_Id = "patient Id" ) %>% mutate(patient_Id = tolower(patient_Id))
+
+# load redcap data
+setwd("D:/ITM ppt/thesis/draft/anaysis")
+redcap <- read_excel("D:/ITM ppt/thesis/draft/anaysis/Redcap_RDT.xlsx",na = "NA")
+redcap <- rename(redcap,patient_Id= "record_id")
+
+photo1_30 <- photo1 %>%filter(`Time(min)`==30) # filter row that contain 30 min result from photo 1 data frame
+# cleaning # 
+#1 Get the number of rows in the object 'photo1_30'
+#2 Get the number of rows in the object 'redcap'
+#3 Count the number of rows where the patient IDs in 'photo1_30' are present in 'redcap'
+#4 Count the number of rows where the patient IDs in 'redcap' are present in 'photo1_30'.
+nrow(photo1_30); nrow(redcap); sum(tolower(photo1_30$patient_Id) %in% tolower(redcap$patient_Id)); sum(tolower(redcap$patient_Id) %in% tolower(photo1_30$patient_Id))
+
+# Convert the column 'patient_Id' in 'photo1_30' to character type
+photo1_30 <- photo1_30 %>% mutate_at("patient_Id" ,as.character)
+# Convert the column 'patient_Id' in 'redcap' to character type
+redcap <- redcap %>% mutate_at("patient_Id" ,as.character)
+#selecting the patient IDs from photo1_30 that are not present in redcap
+notmatched <- tolower(photo1_30$patient_Id[!tolower(photo1_30$patient_Id) %in% tolower(redcap$patient_Id)])
+#creating a list of patient IDs from redcap that are not present in photo1_30
+listno <- tolower(redcap$patient_Id)[!tolower(redcap$patient_Id) %in% tolower(photo1_30$patient_Id)]
+#creating a list of patient IDs from redcap that are present in photo1_30
+listyes <- tolower(redcap$patient_Id)[tolower(redcap$patient_Id) %in% tolower(photo1_30$patient_Id)]
+listno #print lisno
+listyes # print listyes 
+notmatched # print notmatched 
+# Subset the redcap dataframe based on the IDs present in listyes
+subset_redcap <- redcap[redcap$patient_Id %in% listyes,]
+# Subset photo1_30 based on listyes
+subset_photo1_30<- photo1_30[photo1_30$patient_Id %in% listyes,]
+# Remove duplicated rows based on patient_Id within subset_redcap
+subset_redcap <- subset_redcap[!duplicated(subset_redcap$patient_Id), ]
+# Remove duplicated rows based on patient_Id within subset_photo1_30
+subset_photo1_30<- subset_photo1_30[!duplicated(subset_photo1_30$patient_Id), ]
+# check similarities between IDs in the two data frame
+subset_redcap$patient_Id %in% subset_photo1_30$patient_Id
+subset_photo1_30$patient_Id %in% subset_redcap$patient_Id
+# Merge the two subsets based on patient_Id
+photo1_redcap_30 <- merge(subset_photo1_30, subset_redcap, by = "patient_Id")
+# save as excel file 
+write.xlsx(photo1_redcap_30,file = "photo1_redcap_30.xlsx") 
+
+# create subset at 20 min 
+
+photo1_20 <- photo1 %>%filter(`Time(min)`==20)# filter row that contain 20 min result from photo 1 data frame
+# cleaning # 
+#1 Get the number of rows in the object 'photo1_20'
+#2 Get the number of rows in the object 'redcap'
+#3 Count the number of rows where the patient IDs in 'photo1_20' are present in 'redcap'
+#4 Count the number of rows where the patient IDs in 'redcap' are present in 'photo1_20'.
+nrow(photo1_20); nrow(redcap); sum(tolower(photo1_20$patient_Id) %in% tolower(redcap$patient_Id)); sum(tolower(redcap$patient_Id) %in% tolower(photo1_20$patient_Id))
+
+# Convert the column 'patient_Id' in 'photo1_20' to character type
+photo1_20 <- photo1_20 %>% mutate_at("patient_Id" ,as.character)
+# Convert the column 'patient_Id' in 'redcap' to character type
+redcap <- redcap %>% mutate_at("patient_Id" ,as.character)
+#selecting the patient IDs from photo1_20 that are not present in redcap
+notmatched <- tolower(photo1_20$patient_Id[!tolower(photo1_20$patient_Id) %in% tolower(redcap$patient_Id)])
+#creating a list of patient IDs from redcap that are not present in photo1_20
+listno <- tolower(redcap$patient_Id)[!tolower(redcap$patient_Id) %in% tolower(photo1_20$patient_Id)]
+#creating a list of patient IDs from redcap that are present in photo1_20
+listyes <- tolower(redcap$patient_Id)[tolower(redcap$patient_Id) %in% tolower(photo1_20$patient_Id)]
+listno #print lisno
+listyes # print listyes 
+notmatched # print notmatched 
+# Subset the redcap dataframe based on the IDs present in listyes
+subset_redcap <- redcap[redcap$patient_Id %in% listyes,]
+# Subset photo1_20 based on listyes
+subset_photo1_20<- photo1_20[photo1_20$patient_Id %in% listyes,]
+# Remove duplicated rows based on patient_Id within subset_redcap
+subset_redcap <- subset_redcap[!duplicated(subset_redcap$patient_Id), ]
+# Remove duplicated rows based on patient_Id within subset_photo1_20
+subset_photo1_20<- subset_photo1_20[!duplicated(subset_photo1_20$patient_Id), ]
+# Merge the two subsets based on patient_Id
+photo1_redcap_20 <- merge(subset_photo1_20, subset_redcap, by = "patient_Id")
+# check similarities between IDs in the two data frame 
+subset_redcap$patient_Id %in% subset_photo1_20$patient_Id 
+subset_photo1_20$patient_Id %in% subset_redcap$patient_Id 
+# save as excel file 
+write.xlsx(photo1_redcap_20,file = "photo1_redcap_20.xlsx") 
+
+# create subset at 60 min
+
+photo1_60 <- photo1 %>%filter(`Time(min)`==60)# filter row that contain 60 min result from photo 1 data frame
+# cleaning # 
+#1 Get the number of rows in the object 'photo1_60'
+#2 Get the number of rows in the object 'redcap'
+#3 Count the number of rows where the patient IDs in 'photo1_60' are present in 'redcap'
+#4 Count the number of rows where the patient IDs in 'redcap' are present in 'photo1_60'.
+nrow(photo1_60); nrow(redcap); sum(tolower(photo1_60$patient_Id) %in% tolower(redcap$patient_Id)); sum(tolower(redcap$patient_Id) %in% tolower(photo1_60$patient_Id))
+# Convert the column 'patient_Id' in 'photo1_60' to character type
+photo1_60 <- photo1_60 %>% mutate_at("patient_Id" ,as.character)
+# Convert the column 'patient_Id' in 'redcap' to character type
+redcap <- redcap %>% mutate_at("patient_Id" ,as.character)
+#selecting the patient IDs from photo1_60 that are not present in redcap
+notmatched <- tolower(photo1_60$patient_Id[!tolower(photo1_60$patient_Id) %in% tolower(redcap$patient_Id)])
+#creating a list of patient IDs from redcap that are not present in photo1_60
+listno <- tolower(redcap$patient_Id)[!tolower(redcap$patient_Id) %in% tolower(photo1_60$patient_Id)]
+#creating a list of patient IDs from redcap that are present in photo1_60
+listyes <- tolower(redcap$patient_Id)[tolower(redcap$patient_Id) %in% tolower(photo1_60$patient_Id)]
+listno #print lisno
+listyes # print listyes 
+notmatched # print notmatched 
+# Subset the redcap dataframe based on the IDs present in listyes
+subset_redcap <- redcap[redcap$patient_Id %in% listyes,]
+# Subset photo1_60 based on listyes
+subset_photo1_60<- photo1_60[photo1_60$patient_Id %in% listyes,]
+# Remove duplicated rows based on patient_Id within subset_redcap
+subset_redcap <- subset_redcap[!duplicated(subset_redcap$patient_Id), ]
+# Remove duplicated rows based on patient_Id within subset_photo1_60
+subset_photo1_60<- subset_photo1_60[!duplicated(subset_photo1_60$patient_Id), ]
+# check similarities between IDs in the two data frame
+subset_redcap$patient_Id %in% subset_photo1_60$patient_Id
+subset_photo1_60$patient_Id %in% subset_redcap$patient_Id
+# Merge the two subsets based on patient_Id
+photo1_redcap_60 <- merge(subset_photo1_60, subset_redcap, by = "patient_Id")
+# save as excel file 
+write.xlsx(photo1_redcap_60,file = "photo1_redcap_60.xlsx") 
+# merge each subset
+photo_redcap <- bind_rows(photo1_redcap_20,photo1_redcap_30,photo1_redcap_60)
+
+write.xlsx(photo_redcap,file = "15052024_photo_redcap.xlsx") # save as excel file 
+
+
+# prevalence for each RDTs used  based on readout time 
+
+#library#
+library(readxl)
+library(openxlsx)
+library(ggplot2) # data visualization 
+library(gmodels)
+library(tidyverse)
+library(dplyr)
+
+#load photo data
+setwd("D:/ITM ppt/thesis/draft/anaysis")
+photo<-read_excel("D:/ITM ppt/thesis/draft/anaysis/28052024_Photo_valid_Amber.xlsx",na="NA")
+
+#add four column to photo dataframe(16:19) based on the positivity assumption 
+photo <- photo %>%
+  mutate(
+    DDTD_A_allpos = ifelse(DDTD_A_T1 == 1 & DDTD_A_T2 == 1, 1, 0), # select double positive in type A
+    DDTD_A_anypos = ifelse(DDTD_A_T1 == 1 | DDTD_A_T2 == 1, 1, 0), # select at least one positive in type A
+    DDTD_C_allpos = ifelse(DDTD_C_T1 == 1 & DDTD_C_T2 == 1, 1, 0), # select double positive in type C
+    DDTD_C_anypos = ifelse(DDTD_C_T1 == 1 | DDTD_C_T2 == 1, 1, 0)  # select at least one positive in type C
+  )
+
+# Create empty dataframe containing output columns
+tables <- data.frame() 
+for (i in c(20, 30, 60)) { # Looping per time
+  for (j in c(4,5,6,7,10,11,16,17,18,19)) { # Looping per variable
+    
+    # create subset data frame by read out time 
+    sub.data <- subset(photo, `Time(min)` == i) # (sub.data is tmp data frame)
+    # excluding NA, NR, and NV values from  sub.data and store as  filtered
+    filtered<-  sub.data[complete.cases(sub.data[, j]) & complete.cases( sub.data$GADx) & complete.cases( sub.data$Abbott) & 
+                       sub.data$DDTD_A_T1 != "NV" &  sub.data$DDTD_A_T1 != "NR" & 
+                       sub.data$DDTD_A_T2 != "NV" &  sub.data$DDTD_A_T2 != "NR" & 
+                       sub.data$DDTD_C_T1 != "NV" &  sub.data$DDTD_C_T1 != "NR" & 
+                       sub.data$DDTD_C_T2 != "NV" &  sub.data$DDTD_C_T2 != "NR" & 
+                       sub.data$GADx != "NV" &  sub.data$GADx != "NR" & 
+                       sub.data$Abbott != "NV" &  sub.data$Abbott != "NR",]
+    
+    # Skip if no data after filtering
+    if (nrow(filtered) == 0) next
+    # create table of frequency for j column
+    freq <- table(filtered[[j]])
+    # create relative frequency for each column
+    prop <- round(table(filtered[[j]])/length(filtered[[j]]), 2)
+    
+    # create CI for positive result
+    pe.pos<-prop[[2]]  # to select the positive (codes as 1)
+    
+    ll.pos <-(pe.pos - 1.96 *(pe.pos*(1-pe.pos)/ sqrt(length(filtered[[j]]))))*100 # calculate lower limit of CI
+    ul.pos <- (pe.pos + 1.96 *(pe.pos*(1-pe.pos)/ sqrt(length(filtered[[j]]))))*100 # calculate upper limit of CI
+    confi.pos <- paste0("(",round(ll.pos,2), ", ", round(ul.pos, 2), ")") # paste the confidence interval
+    
+    # create CI for negative result
+    pe.neg<-prop[[1]] # to select the negative (codes as 0)
+    
+    ll.neg <-(pe.neg - 1.96 *(pe.neg*(1-pe.neg)/ sqrt(length(filtered[[j]]))))*100 # calculate lower limit
+    ul.neg <- (pe.neg + 1.96 *(pe.neg*(1-pe.neg)/ sqrt(length(filtered[[j]]))))*100 # calculate upper limit
+    confi.neg <- paste0("(",round(ll.neg,2), ", ", round(ul.neg, 2), ")") # paste the confidence interval
+    # Create strings for each column
+    pos_total <- paste0(freq[2], "/", length(filtered[[j]]))
+    prevalence_CI <- paste0(round(prop[2] * 100, 2), " ", confi.pos)
+    neg_total <- paste0(freq[1], "/", length(filtered[[j]]))
+    negative_CI <- paste0(round(prop[1] * 100, 2), " ", confi.neg)
+    new_row <- c(i,colnames(photo[j]), pos_total,prevalence_CI,neg_total, negative_CI) # Creating a vector of the required values including the different amounts of positives and negatives, prevalences, and confidence intervals including all values that count for biplexe and all pos
+    tables <- rbind(tables, new_row) # Adding the vector to the dataframe
+    colnames(tables) <- c("Time", "Tests", paste0("Pos","/","total"), paste0("Prevalence", " ", "(","95%CI",")"),paste0("Neg","/","total"), paste0("Negative", " ", "(","95%CI",")")) # rename the colunm
+  }
+}
+tables # print tables 
+write.xlsx(tables,file = "oncho_RDT_final.xlsx") # save as excel file 
+
+# create barplot of the prevalnce at each time point 
+
+# Convert columns to appropriate types
+tables$Time <- as.numeric(tables$Time)
+tables$`Prevalence` <- as.numeric(as.character(tables$`Prevalence`))
+tables$Total <- as.numeric(as.character(tables$Total))
+
+# Adding a label column for proportions and sample size
+tables$label <- paste0(round(tables$`Prevalence`, 1), "(n=", tables$Total, ")")
+
+# Plotting using ggplot2
+ggplot(tables, aes(x =Tests, y = `Prevalence`, fill = as.factor(Time))) + # Map 'Tests' to the x-axis, 'Prevalence' to the y-axis, and 'Time' as the fill color for bars.
+  geom_bar(stat = "identity", position = "dodge") + # Position bars side by side for different 'Time' points  for each 'Test'
+  geom_text(aes(label = label), position = position_dodge(width = 0.9), vjust = -0.5,size = 3) + # Add text labels to the bars using the 'label' column and align the text with the bars and position it just above them
+  labs(x = "Tests", y = "Prevalence", fill = "Time (min)") + # Set the labels for the x-axis, y-axis, and the fill legend.
+  theme_minimal()+  # Apply a minimalistic theme for a clean and simple plot appearance.
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Customize the x-axis text labels to be angled at 45 degrees for better readability
+
+# kappa agreement between tests at 20,30, and 60 min read out time from photo data (including boottrap for CI)
+
+# function for kappa interpretation 
+interpret_kappa <- function(kappa_value) {
+  if (kappa_value >= 0.81) {
+    return("Almost perfect agreement")
+  } else if (kappa_value >= 0.61) {
+    return("Substantial agreement")
+  } else if (kappa_value >= 0.41) {
+    return("Moderate agreement")
+  } else if (kappa_value >= 0.21) {
+    return("Fair agreement")
+  } else if (kappa_value >= 0.00) {
+    return("Slight agreement")
+  } else {
+    return("Poor agreement")
+  }
+}
+
+#add four column to photo dataframe(16:19) based on the positivity assumption 
+photo <- photo %>%
+  mutate(
+    DDTD_A_allpos = ifelse(DDTD_A_T1 == 1 & DDTD_A_T2 == 1, 1, 0), # select double positive in type A
+    DDTD_A_anypos = ifelse(DDTD_A_T1 == 1 | DDTD_A_T2 == 1, 1, 0), # select at least one positive in type A
+    DDTD_C_allpos = ifelse(DDTD_C_T1 == 1 & DDTD_C_T2 == 1, 1, 0), # select double positive in type C
+    DDTD_C_anypos = ifelse(DDTD_C_T1 == 1 | DDTD_C_T2 == 1, 1, 0)  # select at least one positive in type C
+  )
+# create empty data frame for the  output
+agreement <-as.data.frame(matrix(nrow = 0,ncol = 8))
+for (i in c(20, 30, 60)) {  # Looping per time variable
+  for (j in c(4,5,6,7,10,11,16,17,18,19)) {  # Looping per variable in the col_list
+    for (k in c(4,5,6,7,10,11,16,17,18,19)) {  # Looping per variable in the col_list
+      if (j != k) {  # Exclude comparisons between the same test
+        # Check for duplicates using !any
+        if (!any(agreement$Time_min == i & agreement$first_test == colnames(photo)[k] & agreement$second_test == colnames(photo)[j])) { # Ensure no duplicate comparisons between the same pairs of tests j and k at the same time point i
+          tmp <- subset(photo, `Time(min)` == 20)  # Create subset data based on readout time
+          filtered_data <- tmp[complete.cases(tmp[, j]) & complete.cases(tmp[, k]) & complete.cases(tmp$GADx) & complete.cases(tmp$Abbott) & 
+                                 tmp$DDTD_A_T1 != "NV" & tmp$DDTD_A_T1 != "NR" & 
+                                 tmp$DDTD_A_T2 != "NV" & tmp$DDTD_A_T2 != "NR" & 
+                                 tmp$DDTD_C_T1 != "NV" & tmp$DDTD_C_T1 != "NR" & 
+                                 tmp$DDTD_C_T2 != "NV" & tmp$DDTD_C_T2 != "NR" & 
+                                 tmp$GADx != "NV" & tmp$GADx != "NR" & 
+                                 tmp$Abbott != "NV" & tmp$Abbott != "NR",] # Include only rows where both columns j and k have non-missing values and do not contain "NR" or "NV" values
+          #Skip the loop if the length of the subset is 0
+          if (length(filtered_data) == 0) {
+          next
+          }
+          ratings <- cbind(filtered_data[[j]], filtered_data[[k]])  # Create a data frame or matrix with ratings from both raters
+          
+          kappa_result <- kappam.fleiss(ratings)  # Compute Fleiss' Kappa
+          #kappa_value <- round(kappa_result$value, 2)  # Extract the kappa value and round to 2 decimal places
+          
+          #Bootstrap resampling for Fleiss' kappa
+          bt <- boot(ratings, function(x, idx) {kappam.fleiss(x[idx,])$value}, R = 1000)
+          kappa_ci <- boot.ci(bt, type = "basic")  # Compute basic bootstrap confidence intervals for Fleiss' kappa
+          kappa_value <- round(mean(bt$t), 2)  # Extract the mean kappa value from bootstrap replicates and round to 2 decimal places
+          lower_ci <- round(kappa_ci$basic[4], 2)  # Extract lower confidence interval bound and round to 2 decimal places
+         upper_ci <- round(kappa_ci$basic[5], 2)  # Extract upper confidence interval bound and round to 2 decimal places
+          Conf.kappa <- paste0("(",lower_ci,",", upper_ci,")")
+          #create string for Kappa value and its confidence interval
+          Kappa_CI <- paste0(round(kappa_result$value, 2)," ",Conf.kappa)
+          interpretation <- interpret_kappa(kappa_value)
+          new_row <- c(i,colnames(photo)[j],colnames(photo)[k],Kappa_CI,interpretation)
+          agreement <- rbind(agreement, new_row)  # Add the new row to the agreement data frame
+          colnames(agreement) <- c("Time_min", "first_test", "second_test",paste0("kappa_value","","(","95% CI",")"),"interpretation")
+        }
+      }
+    }
+  }
+}
+agreement 
+write.xlsx(agreement,file = "13052024_kappa_oncho_data.xlsx")
+  
+
+
+
+
