@@ -137,7 +137,7 @@ photo_redcap <- bind_rows(photo1_redcap_20,photo1_redcap_30,photo1_redcap_60)
 write.xlsx(photo_redcap,file = "15052024_photo_redcap.xlsx") # save as excel file 
 
 
-# prevalence for each RDTs used  based on readout time 
+# prevalence for each RDT used  based on readout time 
 
 #library#
 library(readxl)
@@ -299,8 +299,308 @@ for (i in c(20, 30, 60)) {  # Looping per time variable
 }
 agreement 
 write.xlsx(agreement,file = "13052024_kappa_oncho_data.xlsx")
-  
 
+
+# prop.test for each test at different time points (20,30,60) min
+
+# Initialize the agreement data frame with the appropriate column names
+agreement_prop <- data.frame()
+
+# Define the time points to compare
+time_points <- c(20, 30, 60)
+
+# Loop through each column to perform the proportion test across different time points
+for (col_index in c(4, 5, 6, 7, 10, 11, 15, 16, 17, 18, 19)) {
+  col_name <- colnames(photo)[col_index]
+  
+  # Loop through each pair of time points
+  for (i in 1:(length(time_points) - 1)) {
+    for (j in (i + 1):length(time_points)) {
+      time1 <- time_points[i]
+      time2 <- time_points[j]
+      
+      # Subset the data for the current pair of time points
+      tmp1 <- subset(photo, `Time(min)` == time1)
+      tmp2 <- subset(photo, `Time(min)` == time2)
+      
+      # Filter the data to exclude NA, NR, and NV values for the column being tested
+      filtered1 <- tmp1[!is.na(tmp1[[col_index]]) & tmp1[[col_index]] != "NV" & tmp1[[col_index]] != "NR", ]
+      filtered2 <- tmp2[!is.na(tmp2[[col_index]]) & tmp2[[col_index]] != "NV" & tmp2[[col_index]] != "NR", ]
+      
+      # Check if there are enough valid data points in both subsets
+      if (nrow(filtered1) > 0 && nrow(filtered2) > 0) {
+        # Count the occurrences of 1s in each filtered subset
+        x <- c(sum(filtered1[[col_name]] == 1, na.rm = TRUE), sum(filtered2[[col_name]] == 1, na.rm = TRUE))
+        n <- c(nrow(filtered1), nrow(filtered2))
+        
+        if (sum(x) > 0 && min(n) > 0) {  # Ensure there are enough valid data points
+          test_result <- prop.test(x = x, n = n)
+          
+          # Extract the confidence interval and p-value
+          prop_ci <- paste(round(test_result$conf.int, 2), collapse = " , ")
+          prop_p <- round(test_result$p.value, 2)
+          
+          # Create a new row with the results
+          new_row <- data.frame(Tests = col_name, 
+                                Time1 = time1, 
+                                Time2 = time2, 
+                                CI  = prop_ci, 
+                                P_Value = prop_p,
+                                stringsAsFactors = FALSE)
+          
+          # Append the new row to the agreement data frame
+          agreement_prop <- rbind(agreement_prop, new_row)
+        }
+      }
+    }
+  }
+}
+
+# Print the agreement_prop data frame
+print(agreement_prop)
+
+write.xlsx(agreement_prop,file = "07062024_agreement_prop_time.xlsx")
+
+
+# Determining prevalence from data recorded by healthcare workers (redcap)
+
+# library 
+library(readxl)
+library(tidyverse)
+library(openxlsx)
+library(purrr) # count NA values 
+library(gtsummary) # create tables 
+library(magrittr) #merg cross tables  
+
+# load redcap data
+
+setwd("D:/ITM ppt/thesis/draft/anaysis")
+redcap <- read_excel("D:/ITM ppt/thesis/draft/anaysis/Redcap_RDT.xlsx")
+redcap <- rename(redcap,patient_Id= "record_id") # rename patient_Id
+#re code (1,2,3,NA) with (0,1,NR,NA) in ov16_results
+redcap$ov16_results <- ifelse(redcap$ov16_results == 1, 1,
+                              ifelse(redcap$ov16_results == 2, 0,
+                                     ifelse(redcap$ov16_results == 3, "NR",
+                                            ifelse(is.na(redcap$ov16_results), NA, NA))))
+#re code (1,2,3) with (0,1,NR,NA) in gadx_results 
+redcap$gadx_results <- ifelse(redcap$gadx_results == 1, 1,
+                             ifelse(redcap$gadx_results == 2, 0,
+                                    ifelse(redcap$gadx_results == 3, "NR",
+                                           ifelse(is.na(redcap$gadx_results), NA, NA))))
+
+#rename redcap colnames
+redcap <- redcap %>% rename(abbott=ov16_results,gadx=gadx_results,ddtd_a_T1=ddtd_type_a_result___1,ddtd_a_T2=ddtd_type_a_result___2,ddtd_c_T1=ddtd_type_c_result___1,ddtd_c_T2=ddtd_type_c_result___2)
+
+# prevalence 
+
+sapply(redcap, function(x) sum(!is.na(x))) #count non-NA values in all column of redcap 
+
+# add column to the redcap dataframe(18:21)
+redcap <- redcap %>%
+  mutate(
+    ddtd_a_allpos = ifelse(ddtd_a_T1 == 1 & ddtd_a_T2 == 1, 1, 0), # select double positive in type A
+    ddtd_a_anypos = ifelse(ddtd_a_T1 == 1 | ddtd_a_T2 == 1, 1, 0), # select at least one positive in type A
+    ddtd_c_allpos = ifelse(ddtd_c_T1 == 1 & ddtd_c_T2 == 1, 1, 0), # select double positive in type C
+    ddtd_c_anypos = ifelse(ddtd_c_T1 == 1 | ddtd_c_T2 == 1, 1, 0)  # select at least one positive in type C
+  )
+
+# Create empty dataframe containing output columns
+table_redcap <- data.frame() 
+for (j in c(8,9,10,11,14,15,18,19,20,21)) { # Looping per variable
+  
+  # excluding NA values from  redcap and store as   filtered
+  filtered <-  redcap[complete.cases(redcap[,j]) & redcap$gadx!=3,]
+  # Skip if no data after filtering
+  if (nrow(filtered) == 0) next
+  # create table of frequency for j column
+  freq <- table(filtered[[j]])
+  # create relative frequency for each column
+  prop <- round(table(filtered[[j]])/length(filtered[[j]]), 2)
+  
+  # create CI for positive result
+  pe.pos<-prop[[2]]  # to select the positive (codes as 1)
+  
+  ll.pos <-(pe.pos - 1.96 *(pe.pos*(1-pe.pos)/ sqrt(length(filtered[[j]]))))*100 # calculate lower limit of CI
+  ul.pos <- (pe.pos + 1.96 *(pe.pos*(1-pe.pos)/ sqrt(length(filtered[[j]]))))*100 # calculate upper limit of CI
+  confi.pos <- paste0("(",round(ll.pos,2), ", ", round(ul.pos, 2), ")") # paste the confidence interval
+  
+  # create CI for negative result
+  pe.neg<-prop[[1]] # to select the negative (codes as 0)
+  
+  ll.neg <-pe.neg - 1.96 *(pe.neg*(1-pe.neg)/ sqrt(length(filtered[[j]]))) # calculate lower limit
+  ul.neg <- pe.neg + 1.96 *(pe.neg*(1-pe.neg)/ sqrt(length(filtered[[j]]))) # calculate upper limit
+  confi.neg <- paste0("(",round(ll.neg,2), ", ", round(ul.neg, 2), ")") # paste the confidence interval
+  
+  # Create strings for each column
+  pos_total <- paste0(freq[2], "/", length(filtered[[j]]))
+  prevalence_CI <- paste0(round(prop[2] * 100, 2), " ", confi.pos)
+  neg_total <- paste0(freq[1], "/", length(filtered[[j]]))
+  negative_CI <- paste0(round(prop[1] * 100, 2), " ", confi.neg)
+  new_row <- c(colnames(redcap[j]), pos_total,prevalence_CI,neg_total, negative_CI) # Creating a vector of the required values including the different amounts of positives and negatives, prevalences, and confidence intervals including all values that count for biplexe and all pos
+  table_redcap <- rbind(table_redcap, new_row) # Adding the vector to the dataframe
+  colnames(table_redcap) <- c("Tests",paste0("Pos","/","total"), paste0("Prevalence", " ", "(","95%CI",")"),paste0("Neg","/","total"), paste0("Negative", " ", "(","95%CI",")")) # rename the colunm
+  
+}
+
+table_redcap
+write.xlsx(table_redcap,file = "oncho_RDT_redcap.xlsx") # save file as excel 
+
+# create bar graph of prevalence from redcap data 
+
+# Convert columns to appropriate types
+table_redcap$`Prevalence (%)` <- as.numeric(as.character(table_redcap$`Prevalence (%)`))
+table_redcap$Total <- as.numeric(as.character(table_redcap$Total))
+
+# Adding a label column for proportions and sample size
+table_redcap$label <- paste0(round(table_redcap$`Prevalence (%)`, 1), "(n=", table_redcap$Total, ")")
+
+# Plotting using ggplot2
+ggplot(table_redcap, aes(x =Tests, y = `Prevalence (%)`,fill = Tests)) + #Map Tests to the x-axis and Prevalence to the y-axis
+  geom_bar(stat = "identity", position = "dodge") +  #Create a bar chart with bars positioned side-by-side (dodge)
+  geom_text(aes(label = label), position = position_dodge(width = 0.9), vjust = -0.5,size = 3) + #Add the labels above the bars
+  labs(x = "Tests", y = "Prevalence (%)") + #Add axis labels
+  theme_minimal()+ #Apply a minimal theme for a clean look
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Adjust the text angle for the x-axis labels 
+
+#generating a cross-tab between selected clinical variables and different test results 
+
+# add new column to redcap data frame 18:21
+redcap <- redcap %>%
+  mutate(
+    ddtd_a_allpos = ifelse(ddtd_a_T1 == 1 & ddtd_a_T2 == 1, 1, 0), # select double positive in type A
+    ddtd_a_anypos = ifelse(ddtd_a_T1 == 1 | ddtd_a_T2 == 1, 1, 0), # select at least one positive in type A
+    ddtd_c_allpos = ifelse(ddtd_c_T1 == 1 & ddtd_c_T2 == 1, 1, 0), # select double positive in type C
+    ddtd_c_anypos = ifelse(ddtd_c_T1 == 1 | ddtd_c_T2 == 1, 1, 0)  # select at least one positive in type C
+  )
+
+# create  an empty list to store contingency tables
+cross_tables <- list()
+
+# loop to create contingency tables
+for (i in c(2, 6)) { #loop per clinical variable (ivermectin use and presents of  nodules) 
+  for (j in c(8, 9, 10, 11, 14, 15,18,19,20,21)) { # loop per test 
+    # Filter out rows with NA in the relevant columns
+    filtered_redcap <- redcap %>%
+      filter(!is.na(.[[i]]) & !is.na(.[[j]]))
+    
+    # Create a contingency table
+    cross_table <- filtered_redcap %>%
+      tbl_cross(
+        row = colnames(filtered_redcap)[i],
+        col = colnames(filtered_redcap)[j],
+        percent = "cell"
+      ) %>%
+      add_p()%>% 
+      as_tibble()# Convert to tibble (or data frame)
+    #Prepend column name to each existing column name
+    colnames(cross_table) <- paste(colnames(redcap)[j], colnames(cross_table), sep = "_")
+    # Store contingency table in the list
+    cross_tables[[length(cross_tables) + 1]] <- cross_table
+  }
+}
+
+# Merge all contingency tables
+merged_table <- bind_cols(cross_tables)
+merged_table # print merged table 
+write.xlsx(merged_table,file="03062024_redcap_contigency.xlsx") # save as excel file 
+
+
+# Agreement between data recorded by HCWs (redcap) and photo captured by HCWs (photo) #   
+
+#library#
+library(readxl)
+library(openxlsx)
+library(ggplot2)
+library(gmodels)
+library(tidyverse)
+library(dplyr)
+library(irr)
+library(boot)
+##load the merged file containing the two datasets  ##
+setwd("D:/ITM ppt/thesis/draft/anaysis")
+photo_redcap <- read_excel("15052024_photo_redcap.xlsx")
+# recode the values of ov16_results and gadx_results in photo_redcap
+photo_redcap$ov16_results <- ifelse(photo_redcap$ov16_results==1,1,ifelse(photo_redcap$ov16_results==2,0,ifelse(is.na(photo_redcap$ov16_results),NA,NA)))
+photo_redcap$ov16_results <- as.character(photo_redcap$ov16_results)
+photo_redcap$gadx_results <- ifelse(photo_redcap$gadx_results==1,1,ifelse(photo_redcap$gadx_results==2,0,ifelse(is.na(photo_redcap$gadx_results),NA,NA)))
+photo_redcap$gadx_results <- as.character(photo_redcap$gadx_results)
+
+#rename column of photo_redcap
+photo_redcap <- photo_redcap %>% rename(abbott=ov16_results,gadx=gadx_results,ddtd_a_T1=ddtd_type_a_result___1,ddtd_a_T2=ddtd_type_a_result___2,ddtd_c_T1=ddtd_type_c_result___1,ddtd_c_T2=ddtd_type_c_result___2)
+
+
+##test agreement between each test at each readout time from photo and redcap data  (including boottrap for CI)
+names(photo_redcap) # mention the name of each column in the photo data 
+
+# function for kappa interpretation 
+interpret_kappa <- function(kappa_value) {
+  if (kappa_value >= 0.81) {
+    return("Almost perfect agreement")
+  } else if (kappa_value >= 0.61) {
+    return("Substantial agreement")
+  } else if (kappa_value >= 0.41) {
+    return("Moderate agreement")
+  } else if (kappa_value >= 0.21) {
+    return("Fair agreement")
+  } else if (kappa_value >= 0.00) {
+    return("Slight agreement")
+  } else {
+    return("Poor agreement")
+  }
+}
+photo_redcap <- photo_redcap %>%
+  mutate(
+    DDTD_A_allpos = ifelse(DDTD_A_T1 == 1 & DDTD_A_T2 == 1, 1, 0), # select double positive in type A
+    DDTD_A_anypos = ifelse(DDTD_A_T1 == 1 | DDTD_A_T2 == 1, 1, 0), # select at least one positive in type A
+    DDTD_C_allpos = ifelse(DDTD_C_T1 == 1 & DDTD_C_T2 == 1, 1, 0), # select double positive in type C
+    DDTD_C_anypos = ifelse(DDTD_C_T1 == 1 | DDTD_C_T2 == 1, 1, 0),  # select at least one positive in type C
+    ddtd_a_allpos = ifelse(ddtd_a_T1 == 1 & ddtd_a_T2 == 1, 1, 0), # select double positive in type a
+    ddtd_a_anypos = ifelse(ddtd_a_T1  == 1 | ddtd_a_T2 == 1, 1, 0), # select at least one positive in type a
+    ddtd_c_allpos = ifelse(ddtd_c_T1  == 1 & ddtd_c_T2 == 1, 1, 0), # select double positive in type c
+    ddtd_c_anypos = ifelse(ddtd_c_T1 == 1 | ddtd_c_T2 == 1, 1, 0)  # select at least one positive in type c
+  )
+#create empty data frame  
+agreement <-as.data.frame(matrix(nrow = 0,ncol = 8))
+for (i in c(20, 30, 60)) {  # Looping per time variable
+  for (j in c(4,5,6,7,10,11,32,33,34,35)) {  # Looping per variable in photo_recap
+    for (k in c(22,23,24,25,28,29,36,37,38,39)) {  # Looping per variable in photo_recap
+      #if (j != k) {  # Exclude comparisons between the same test
+        #if (length(which(agreement[,2]==k & agreement[,3]==j & agreement[,1]==i))==0) { # Ensure no duplicate comparisons between the same pairs of tests j and k at the same time point i
+          tmp <- subset(photo_redcap, `Time(min)` == 20)  # Create subset data based on readout time
+          filtered_data <- tmp[complete.cases(tmp[, j]) & complete.cases(tmp[, k]) & 
+                                 tmp$DDTD_A_T1 != "NV" & tmp$DDTD_A_T1 != "NR" & 
+                                 tmp$DDTD_A_T2 != "NV" & tmp$DDTD_A_T2 != "NR" & 
+                                 tmp$DDTD_C_T1 != "NV" & tmp$DDTD_C_T1 != "NR" & 
+                                 tmp$DDTD_C_T2 != "NV" & tmp$DDTD_C_T2 != "NR" & 
+                                 tmp$GADx != "NV" & tmp$GADx != "NR" & 
+                                 tmp$Abbott != "NV" & tmp$Abbott != "NR" &
+                                 tmp$gadx != 3, ]# Include only rows where both columns j and k have non-missing values and do not contain "NR" or "NV" values
+          # Skip the loop if the length of the subset is 0
+          if (nrow(filtered_data) == 0) {
+          next
+        }
+        ratings <- cbind(filtered_data[[j]], filtered_data[[k]])  # Create a data frame or matrix with ratings from both raters
+        
+        kappa_result <- kappam.fleiss(ratings)  # Compute Fleiss' Kappa
+        #kappa_value <- round(kappa_result$value, 2)  # Extract the kappa value and round to 2 decimal places
+        
+        #Bootstrap resampling for Fleiss' kappa
+        bt <- boot(ratings, function(x, idx) {kappam.fleiss(x[idx,])$value}, R = 1000)
+        kappa_ci <- boot.ci(bt, type = "basic")  # Compute basic bootstrap confidence intervals for Fleiss' kappa
+       kappa_value <- round(mean(bt$t), 2)  # Extract the mean kappa value from bootstrap replicates and round to 2 decimal places
+        lower_ci <- round(kappa_ci$basic[4], 2)  # Extract lower confidence interval bound and round to 2 decimal places
+       upper_ci <- round(kappa_ci$basic[5], 2)  # Extract upper confidence interval bound and round to 2 decimal places
+        Conf.kappa <- paste0("(",lower_ci,",",upper_ci,")")
+        Kappa_CI <- paste0(round(kappa_result$value, 2)," ",Conf.kappa)
+        interpretation <- interpret_kappa(kappa_value)
+       new_row <- c(i,colnames(photo_redcap)[j],colnames(photo_redcap)[k],Kappa_CI,interpretation)
+      agreement <- rbind(agreement, new_row)  # Add the new row to the agreement data frame
+        colnames(agreement) <- c("Time_min", "first_test", "second_test",paste0("kappa_value","","(","95% CI",")"),"interpretation")  # Rename the column names of the agreement data frame
+      }
+    }
+  }
+agreement
+write.xlsx(agreement,file = "15052024_agreement_photo_redcap.xlsx")
 
 
 
