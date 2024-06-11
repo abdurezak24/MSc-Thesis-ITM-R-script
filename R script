@@ -604,3 +604,97 @@ write.xlsx(agreement,file = "15052024_agreement_photo_redcap.xlsx")
 
 
 
+# sens and spec using different data set combination
+
+#load redcap_DBS_skin  data 
+setwd("D:/ITM ppt/thesis/draft/anaysis")
+redcap_DBS_skin <- read_excel("08062024_redcap_DBS_skin.xlsx",na="NA")
+
+#rename column of redcap_DBS_skin
+redcap_DBS_skin <- redcap_DBS_skin %>% rename(abbott=ov16_results,gadx=gadx_results,ddtd_a_T1=ddtd_type_a_result___1,ddtd_a_T2=ddtd_type_a_result___2,ddtd_c_T1=ddtd_type_c_result___1,ddtd_c_T2=ddtd_type_c_result___2,
+                                ELISA=Result)
+#re code (1,2,3) with (0,1,NA) in abbott
+redcap_DBS_skin$abbott <- ifelse(redcap_DBS_skin$abbott == 1, 1,
+                          ifelse(redcap_DBS_skin$abbott == 2, 0,
+                                 ifelse(redcap_DBS_skin$abbott == 3, "NR",
+                                        ifelse(is.na(redcap_DBS_skin$abbott), NA, NA))))
+#re code (1,2,3) with (0,1,NR,NA) in gadx 
+redcap_DBS_skin$gadx <- ifelse(redcap_DBS_skin$gadx == 1, 1,
+                        ifelse(redcap_DBS_skin$gadx == 2, 0,
+                               ifelse(redcap_DBS_skin$gadx == 3, "NR",
+                                      ifelse(is.na(redcap_DBS_skin$gadx), NA, NA))))
+
+# change MF count to numeric variables 
+redcap_DBS_skin$`MF count R` <- as.numeric(redcap_DBS_skin$`MF count R`)
+redcap_DBS_skin$`MF count L` <- as.numeric(redcap_DBS_skin$`MF count L`)
+
+names(redcap_DBS_skin)
+
+# add new columns(15:18) to 'redcap_DBS_skin' dataframe 
+redcap_DBS_skin <- redcap_DBS_skin %>%
+  mutate(
+    ddtd_a_allpos = ifelse(ddtd_a_T1 == 1 & ddtd_a_T2 == 1, 1, 0), # select double positive in type a
+    ddtd_a_anypos = ifelse(ddtd_a_T1  == 1 | ddtd_a_T2 == 1, 1, 0), # select at least one positive in type a
+    ddtd_c_allpos = ifelse(ddtd_c_T1  == 1 & ddtd_c_T2 == 1, 1, 0), # select double positive in type c
+    ddtd_c_anypos = ifelse(ddtd_c_T1 == 1 | ddtd_c_T2 == 1, 1, 0),  # select at least one positive in type c
+    microscope=ifelse(redcap_DBS_skin$`MF count R`>0|redcap_DBS_skin$`MF count L`>0,1,0)
+  )
+
+Dperformance <-data.frame()
+for(i in c(8,9,10,11,14,15,32,33,34,35)){#looping per column(tests)
+  # filter out NA,NR and NV from intended column of redcap_DBS_skin and store as filtered 
+  filtered <- redcap_DBS_skin[complete.cases(redcap_DBS_skin[, i ])& redcap_DBS_skin$gadx!=3,]
+  # Skip if no data after filtering
+  if (nrow(filtered) == 0) next
+  
+  #define reference standard 
+  CRS1 <- ifelse(filtered$microscope==1,1,0)# use micrsocope only
+  #CRS1 <- !is.na(CRS1)
+  CRS2 <- ifelse(filtered$ELISA==1,1,0) # use ElISA only
+  #CRS2 <- !is.na(CRS2)
+  CRS3 <- ifelse(filtered$microscope==1|filtered$ELISA==1,1,0)# create composite reference considering any positive 
+  #CRS3 <- !is.na(CRS3)
+  CRS4 <- ifelse(filtered$microscope==1 & filtered$ELISA==1,1,0) # create composite reference considering all positive
+  #CRS4 <- !is.na(CRS4)
+  # Function to calculate performance metrics for a given CRS
+  calculate_metrics <- function(filtered, column_index, CRS) {
+    table_matrix <- table(filtered[[column_index]], CRS)
+    
+    # Calculate sensitivity and specificity
+    sensitivity <- round((table_matrix[2,2] / (table_matrix[2,2] + table_matrix[1,2])) * 100, 1)
+    specificity <- round((table_matrix[1,1] / (table_matrix[1,1] + table_matrix[2,1])) * 100, 1)
+    
+    # Calculate confidence intervals for sensitivity and specificity
+    sens_test <- binom.test(table_matrix[2,2], (table_matrix[2,2] + table_matrix[1,2]), conf.level = 0.95)
+    spec_test <- binom.test(table_matrix[1,1], (table_matrix[1,1] + table_matrix[2,1]), conf.level = 0.95)
+    sens_CI <- round(sens_test$conf.int * 100, 1)
+    spec_CI <- round(spec_test$conf.int * 100, 1)
+    
+    # Create string values for sens, spec and CI
+    sens_conf <- paste0(sensitivity, " (", sens_CI[1], ",", sens_CI[2], ")")
+    spec_conf <- paste0(specificity, " (", spec_CI[1], ",", spec_CI[2], ")")
+    
+    # Calculate PPV and NPV
+    PPV <- round((table_matrix[2,2] / (table_matrix[2,2] + table_matrix[2,1])) * 100, 1)
+    NPV <- round((table_matrix[1,1] / (table_matrix[1,1] + table_matrix[1,2])) * 100, 1)
+    
+    return(c(sens_conf, spec_conf, PPV, NPV))
+  }
+  
+  # Calculate metrics for each CRS and store in Dperformance
+  crs_list <- list(CRS1, CRS2, CRS3, CRS4)
+  for (j in 1:4) {
+    metrics <- calculate_metrics(filtered, i, crs_list[[j]])
+    new_row <- c(colnames(redcap_DBS_skin)[i], paste0("CRS", j), metrics)
+    Dperformance <- rbind(Dperformance, new_row)
+  }
+}
+
+# Rename columns of Dperformance
+colnames(Dperformance) <- c("Tests", "CRS_Type", "Sensitivity", "Specificity", "PPV", "NPV")
+
+# Print the result
+Dperformance  
+
+#save all CRS output 
+write.xlsx(Dperformance,file = "09062024_Dperfomance_redcap_DBS_skin_CRS.xlsx")
