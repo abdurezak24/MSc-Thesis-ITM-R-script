@@ -698,3 +698,42 @@ Dperformance
 
 #save all CRS output 
 write.xlsx(Dperformance,file = "09062024_Dperfomance_redcap_DBS_skin_CRS.xlsx")
+
+# Create  a barplot for each  reference standard  using the sensitivity and specificity output (Dperformance  )
+# Subset Dperformance to include only specified rows (containing abbot,gadx,ddtd-a-allpos,ddtd-a-allpos,ddtd-c-allpos,ddtd-c-anypos ) for specific composite reference (CRS3 or CRS4)
+selected_rows <- c(3,7, 27,31, 35, 39) # select rows for the selected test using CRS3 (composite reference considering any positive) 
+#Dperformance_subset <- Dperformance[c(4, 8, 28, 32, 36, 40), ] # subset the output dataframe (Dperformance)  for the selected test using CRS4 (composite reference considering all positive) and switch  the downstream code to CRS4 
+Dperformance_subset <- Dperformance[c(3,7, 27,31, 35, 39), ] # subset the output dataframe (Dperformance) for the selected test using CRS3 (composite reference considering any positive)
+# Filter the data to include only rows with CRS_Type 'CRS3'
+Dperformance_CRS3 <-Dperformance_subset %>% filter(CRS_Type == "CRS3")
+
+# Convert Tests to factor to ensure proper ordering if necessary
+Dperformance_CRS3$Tests <- factor(Dperformance_CRS3$Tests, levels = unique(Dperformance_CRS3$Tests))
+
+# Reshape data into long format for sensitivity and specificity
+Dperformance_long_CRS3 <- Dperformance_CRS3 %>%
+  pivot_longer(cols = c(`Sensitivity`, `Specificity`),
+               names_to = "Measure",
+               values_to = "Value")
+
+# Extract the numeric values from the sensitivity and specificity columns
+Dperformance_long_CRS3 <- Dperformance_long_CRS3 %>%
+  mutate(NumericValue = as.numeric(sub(" .*", "", Value))) # Extract the numeric part before the CI
+
+# Print the reshaped data for verification
+print(Dperformance_long_CRS3)
+
+# Create the grouped bar plot for CRS3
+ggplot(Dperformance_long_CRS3, aes(x = Tests, y = NumericValue, fill = Measure)) + 
+  geom_bar(position = position_dodge(width = 0.8), stat = "identity") +
+  geom_text(aes(label = paste0(NumericValue, "%")), 
+            position = position_dodge(width = 0.8), vjust = -0.5, size = 3) + # Add text labels on bars
+  labs(title = "Sensitivity and Specificity  by Tests", 
+       x = "Tests", 
+       y = "Percentage") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), # Rotate x-axis labels for better readability
+        legend.position = "bottom") + # Move legend to the bottom for clarity
+  scale_fill_manual(values = c("gray50", "gray80")) # Set fill color to shades of gray
+
